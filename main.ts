@@ -20,14 +20,23 @@ interface GhosttyTerminalSettings {
   defaultOpenLocation: DefaultOpenLocation;
   focusExistingTerminal: boolean;
   initialInput: string;
+  enableVibeShellMenu: boolean;
+  vibeShellCommand: string;
 }
 
 const DEFAULT_SETTINGS: GhosttyTerminalSettings = {
   ghosttyAppName: "Ghostty",
   defaultOpenLocation: "current-file-folder",
   focusExistingTerminal: true,
-  initialInput: ""
+  initialInput: "",
+  enableVibeShellMenu: false,
+  vibeShellCommand: ""
 };
+
+interface OpenGhosttyOptions {
+  initialInput?: string;
+  label?: string;
+}
 
 export default class GhosttyTerminalPlugin extends Plugin {
   settings: GhosttyTerminalSettings = DEFAULT_SETTINGS;
@@ -89,6 +98,17 @@ export default class GhosttyTerminalPlugin extends Plugin {
           void this.openAtAbstractFile(file);
         });
     });
+
+    if (this.settings.enableVibeShellMenu) {
+      menu.addItem((item) => {
+        item
+          .setTitle("Open in Vibe Shell")
+          .setIcon("terminal")
+          .onClick(() => {
+            void this.openVibeShellAtAbstractFile(file);
+          });
+      });
+    }
   }
 
   private async openDefaultLocation(): Promise<void> {
@@ -127,23 +147,49 @@ export default class GhosttyTerminalPlugin extends Plugin {
   }
 
   private async openAtAbstractFile(file: TAbstractFile): Promise<void> {
-    const vaultPath = this.getVaultPath();
-    if (!vaultPath) {
+    const targetPath = this.getPathForAbstractFile(file);
+    if (!targetPath) {
       new Notice("Ghostty Terminal: desktop vault path is unavailable.");
       return;
     }
 
-    if (file instanceof TFolder) {
-      await this.openGhostty(path.join(vaultPath, file.path));
+    await this.openGhostty(targetPath);
+  }
+
+  private async openVibeShellAtAbstractFile(file: TAbstractFile): Promise<void> {
+    const command = this.settings.vibeShellCommand.trim();
+    if (!command) {
+      new Notice("Ghostty Terminal: set a Vibe Shell command first.");
       return;
+    }
+
+    const targetPath = this.getPathForAbstractFile(file);
+    if (!targetPath) {
+      new Notice("Ghostty Terminal: desktop vault path is unavailable.");
+      return;
+    }
+
+    await this.openGhostty(targetPath, {
+      initialInput: command,
+      label: "Vibe Shell"
+    });
+  }
+
+  private getPathForAbstractFile(file: TAbstractFile): string | null {
+    const vaultPath = this.getVaultPath();
+    if (!vaultPath) {
+      return null;
+    }
+
+    if (file instanceof TFolder) {
+      return joinVaultPath(vaultPath, file.path);
     }
 
     if (file instanceof TFile && file.parent) {
-      await this.openGhostty(path.join(vaultPath, file.parent.path));
-      return;
+      return joinVaultPath(vaultPath, file.parent.path);
     }
 
-    await this.openGhostty(vaultPath);
+    return vaultPath;
   }
 
   private getVaultPath(): string | null {
@@ -155,17 +201,19 @@ export default class GhosttyTerminalPlugin extends Plugin {
     return null;
   }
 
-  private async openGhostty(workingDirectory: string): Promise<void> {
+  private async openGhostty(workingDirectory: string, options: OpenGhosttyOptions = {}): Promise<void> {
     if (process.platform !== "darwin") {
       new Notice("Ghostty Terminal: this plugin currently supports macOS only.");
       return;
     }
 
-    const script = this.buildAppleScript(workingDirectory);
+    const label = options.label ?? "Ghostty";
+    const script = this.buildAppleScript(workingDirectory, options.initialInput);
 
     try {
-      await execFileAsync("/usr/bin/osascript", ["-e", script]);
-      new Notice(`Opened Ghostty: ${workingDirectory}`);
+      const result = (await execFileAsync("/usr/bin/osascript", ["-e", script])).trim();
+      const verb = result === "focused" ? "Focused" : "Opened";
+      new Notice(`${verb} ${label}: ${workingDirectory}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       new Notice(`Ghostty Terminal failed: ${message}`);
@@ -173,17 +221,18 @@ export default class GhosttyTerminalPlugin extends Plugin {
     }
   }
 
-  private buildAppleScript(workingDirectory: string): string {
+  private buildAppleScript(workingDirectory: string, initialInput?: string): string {
     const escapedAppName = escapeAppleScriptString(this.settings.ghosttyAppName);
     const escapedWorkingDirectory = escapeAppleScriptString(workingDirectory);
-    const escapedInitialInput = escapeAppleScriptString(this.settings.initialInput.trim());
+    const input = initialInput ?? this.settings.initialInput;
+    const escapedInitialInput = escapeAppleScriptString(input.trim());
     const focusExistingBlock = this.settings.focusExistingTerminal
       ? `
         set matchingTerminals to every terminal whose working directory is targetDirectory
         if (count of matchingTerminals) > 0 then
           set targetTerminal to item 1 of matchingTerminals
           focus targetTerminal
-          return
+          return "focused"
         end if`
       : "";
     const initialInputBlock = escapedInitialInput
@@ -200,6 +249,7 @@ export default class GhosttyTerminalPlugin extends Plugin {
         set initial working directory of cfg to targetDirectory
         set win to new window with configuration cfg
         set targetTerminal to terminal 1 of selected tab of win${initialInputBlock}
+        return "opened"
       end tell
     `;
   }
@@ -268,22 +318,55 @@ class GhosttyTerminalSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    new Setting(containerEl)
+      .setName("Vibe Shell context menu")
+      .setDesc("Add an Open in Vibe Shell action to file and folder context menus.")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.enableVibeShellMenu)
+          .onChange(async (value) => {
+            this.plugin.settings.enableVibeShellMenu = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Vibe Shell command")
+      .setDesc("Command to send only when Open in Vibe Shell creates a new Ghostty window.")
+      .addText((text) => {
+        text
+          .setPlaceholder("vibe shell")
+          .setValue(this.plugin.settings.vibeShellCommand)
+          .onChange(async (value) => {
+            this.plugin.settings.vibeShellCommand = value;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }
 
-function execFileAsync(file: string, args: string[]): Promise<void> {
+function execFileAsync(file: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(file, args, (error) => {
+    execFile(file, args, (error, stdout) => {
       if (error) {
         reject(error);
         return;
       }
 
-      resolve();
+      resolve(stdout);
     });
   });
 }
 
 function escapeAppleScriptString(value: string): string {
   return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function joinVaultPath(vaultPath: string, vaultRelativePath: string): string {
+  if (!vaultRelativePath || vaultRelativePath === "/") {
+    return vaultPath;
+  }
+
+  return path.join(vaultPath, vaultRelativePath);
 }

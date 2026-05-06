@@ -10,6 +10,7 @@ Ghostty Terminal opens [Ghostty](https://ghostty.org/) at your vault, current no
 - Open Ghostty at the active note's folder.
 - Open Ghostty from the file explorer context menu.
 - Optionally send initial input after the Ghostty window opens.
+- Add an optional `Open in Vibe Shell` context menu action that sends a custom command only for newly created Ghostty windows.
 
 ## Requirements
 
@@ -31,6 +32,8 @@ The first launch may trigger a macOS Automation permission prompt allowing Obsid
 - `Ribbon default location`: choose whether the ribbon and default command open the current file folder or vault root.
 - `Focus existing terminal`: focus a Ghostty terminal with the same working directory instead of opening a duplicate window.
 - `Initial input`: optional text to send after opening the new Ghostty window, such as `nvim .`.
+- `Vibe Shell context menu`: add `Open in Vibe Shell` to file and folder context menus.
+- `Vibe Shell command`: command to send when `Open in Vibe Shell` creates a new Ghostty window.
 
 ## Community Plugin Install
 
