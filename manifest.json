@@ -1,0 +1,10 @@
+{
+  "id": "ghostty-terminal",
+  "name": "Ghostty Terminal",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Open Ghostty from Obsidian at the current vault, file, or folder location.",
+  "author": "lincya",
+  "authorUrl": "https://github.com/OhLuckyChen",
+  "isDesktopOnly": true
+}
