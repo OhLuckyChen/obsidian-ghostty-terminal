@@ -1,7 +1,7 @@
 {
   "name": "obsidian-ghostty-terminal",
   "version": "0.1.0",
-  "description": "Obsidian plugin that opens Ghostty at vault and file locations.",
+  "description": "Open Ghostty at vault and file locations.",
   "main": "main.js",
   "repository": {
     "type": "git",

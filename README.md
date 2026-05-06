@@ -1,6 +1,6 @@
 # Ghostty Terminal
 
-Ghostty Terminal is an Obsidian desktop plugin that opens [Ghostty](https://ghostty.org/) at your vault, current note folder, or a selected file/folder location.
+Ghostty Terminal opens [Ghostty](https://ghostty.org/) at your vault, current note folder, or a selected file/folder location.
 
 ## Features
 
