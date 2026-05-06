@@ -1,0 +1,51 @@
+.ghostty-terminal-inline-host {
+  position: relative;
+}
+
+.ghostty-terminal-inline-actions {
+  align-items: center;
+  bottom: 0;
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  opacity: 0;
+  padding-right: 4px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+.ghostty-terminal-inline-host:hover .ghostty-terminal-inline-actions,
+.ghostty-terminal-inline-host:focus-within .ghostty-terminal-inline-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ghostty-terminal-inline-action {
+  align-items: center;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 20px;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  width: 20px;
+}
+
+.ghostty-terminal-inline-action:hover,
+.ghostty-terminal-inline-action:focus-visible {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.ghostty-terminal-inline-action svg {
+  height: 14px;
+  width: 14px;
+}

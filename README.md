@@ -11,6 +11,7 @@ Ghostty Terminal opens [Ghostty](https://ghostty.org/) at your vault, current no
 - Open Ghostty from the file explorer context menu.
 - Optionally send initial input after the Ghostty window opens.
 - Add an optional `Open in Vibe Shell` context menu action that sends a custom command only for newly created Ghostty windows.
+- Add optional hover buttons to file explorer rows for faster Ghostty and Vibe Shell actions.
 
 ## Requirements
 
@@ -34,6 +35,8 @@ The first launch may trigger a macOS Automation permission prompt allowing Obsid
 - `Initial input`: optional text to send after opening the new Ghostty window, such as `nvim .`.
 - `Vibe Shell context menu`: add `Open in Vibe Shell` to file and folder context menus.
 - `Vibe Shell command`: command to send when `Open in Vibe Shell` creates a new Ghostty window.
+- `Show Ghostty inline button`: show an `Open in Ghostty` button when hovering file explorer rows.
+- `Show Vibe Shell inline button`: show an `Open in Vibe Shell` button when hovering file explorer rows.
 
 ## Community Plugin Install
 
@@ -45,7 +48,7 @@ After the plugin is accepted into the Obsidian community plugin directory:
 
 ## Manual Install
 
-Download `main.js` and `manifest.json` from the latest GitHub release, then copy them into:
+Download `main.js`, `manifest.json`, and `styles.css` from the latest GitHub release, then copy them into:
 
 ```text
 <your-vault>/.obsidian/plugins/ghostty-terminal

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-ghostty-terminal",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Open Ghostty at vault and file locations.",
   "main": "main.js",
   "repository": {

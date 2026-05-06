@@ -8,12 +8,17 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  setIcon,
   TAbstractFile,
   TFile,
   TFolder
 } from "obsidian";
 
 type DefaultOpenLocation = "current-file-folder" | "vault-root";
+
+const FILE_EXPLORER_TITLE_SELECTOR = ".nav-file-title, .nav-folder-title";
+const INLINE_ACTIONS_CLASS = "ghostty-terminal-inline-actions";
+const INLINE_HOST_CLASS = "ghostty-terminal-inline-host";
 
 interface GhosttyTerminalSettings {
   ghosttyAppName: string;
@@ -22,6 +27,8 @@ interface GhosttyTerminalSettings {
   initialInput: string;
   enableVibeShellMenu: boolean;
   vibeShellCommand: string;
+  showGhosttyInlineButton: boolean;
+  showVibeShellInlineButton: boolean;
 }
 
 const DEFAULT_SETTINGS: GhosttyTerminalSettings = {
@@ -30,7 +37,9 @@ const DEFAULT_SETTINGS: GhosttyTerminalSettings = {
   focusExistingTerminal: true,
   initialInput: "",
   enableVibeShellMenu: false,
-  vibeShellCommand: ""
+  vibeShellCommand: "",
+  showGhosttyInlineButton: true,
+  showVibeShellInlineButton: true
 };
 
 interface OpenGhosttyOptions {
@@ -40,6 +49,8 @@ interface OpenGhosttyOptions {
 
 export default class GhosttyTerminalPlugin extends Plugin {
   settings: GhosttyTerminalSettings = DEFAULT_SETTINGS;
+  private fileExplorerObserver: MutationObserver | null = null;
+  private inlineRefreshTimeout: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -78,6 +89,7 @@ export default class GhosttyTerminalPlugin extends Plugin {
       })
     );
 
+    this.registerFileExplorerInlineActions();
     this.addSettingTab(new GhosttyTerminalSettingTab(this.app, this));
   }
 
@@ -87,6 +99,154 @@ export default class GhosttyTerminalPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  refreshFileExplorerInlineActions(): void {
+    this.removeFileExplorerInlineActions();
+    this.addFileExplorerInlineActions();
+  }
+
+  private addFileExplorerInlineActions(): void {
+    if (!this.settings.showGhosttyInlineButton && !this.settings.showVibeShellInlineButton) {
+      return;
+    }
+
+    document.querySelectorAll<HTMLElement>(FILE_EXPLORER_TITLE_SELECTOR).forEach((titleEl) => {
+      this.addInlineActionsToFileExplorerTitle(titleEl);
+    });
+  }
+
+  private registerFileExplorerInlineActions(): void {
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => {
+        this.queueRefreshFileExplorerInlineActions();
+      })
+    );
+
+    this.fileExplorerObserver = new MutationObserver(() => {
+      this.queueRefreshFileExplorerInlineActions();
+    });
+    this.fileExplorerObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    this.register(() => {
+      this.fileExplorerObserver?.disconnect();
+      this.fileExplorerObserver = null;
+
+      if (this.inlineRefreshTimeout !== null) {
+        window.clearTimeout(this.inlineRefreshTimeout);
+        this.inlineRefreshTimeout = null;
+      }
+
+      this.removeFileExplorerInlineActions();
+    });
+
+    this.queueRefreshFileExplorerInlineActions();
+  }
+
+  private queueRefreshFileExplorerInlineActions(): void {
+    if (this.inlineRefreshTimeout !== null) {
+      window.clearTimeout(this.inlineRefreshTimeout);
+    }
+
+    this.inlineRefreshTimeout = window.setTimeout(() => {
+      this.inlineRefreshTimeout = null;
+      this.addFileExplorerInlineActions();
+    }, 100);
+  }
+
+  private addInlineActionsToFileExplorerTitle(titleEl: HTMLElement): void {
+    if (titleEl.querySelector(`.${INLINE_ACTIONS_CLASS}`)) {
+      return;
+    }
+
+    if (!this.getFileFromExplorerTitle(titleEl)) {
+      return;
+    }
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = INLINE_ACTIONS_CLASS;
+
+    if (this.settings.showGhosttyInlineButton) {
+      actionsEl.appendChild(
+        this.createInlineActionButton("Open in Ghostty", "terminal", () => {
+          void this.openFromExplorerTitle(titleEl, "ghostty");
+        })
+      );
+    }
+
+    if (this.settings.showVibeShellInlineButton) {
+      actionsEl.appendChild(
+        this.createInlineActionButton("Open in Vibe Shell", "sparkles", () => {
+          void this.openFromExplorerTitle(titleEl, "vibe-shell");
+        })
+      );
+    }
+
+    if (actionsEl.childElementCount === 0) {
+      return;
+    }
+
+    titleEl.classList.add(INLINE_HOST_CLASS);
+    titleEl.appendChild(actionsEl);
+  }
+
+  private createInlineActionButton(label: string, icon: string, onClick: () => void): HTMLButtonElement {
+    const buttonEl = document.createElement("button");
+    buttonEl.type = "button";
+    buttonEl.className = "ghostty-terminal-inline-action";
+    buttonEl.ariaLabel = label;
+    buttonEl.title = label;
+    setIcon(buttonEl, icon);
+
+    buttonEl.addEventListener("mousedown", stopInlineActionEvent);
+    buttonEl.addEventListener("pointerdown", stopInlineActionEvent);
+    buttonEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    });
+
+    return buttonEl;
+  }
+
+  private removeFileExplorerInlineActions(): void {
+    document.querySelectorAll<HTMLElement>(`.${INLINE_ACTIONS_CLASS}`).forEach((el) => {
+      el.remove();
+    });
+
+    document.querySelectorAll<HTMLElement>(`.${INLINE_HOST_CLASS}`).forEach((el) => {
+      el.classList.remove(INLINE_HOST_CLASS);
+    });
+  }
+
+  private async openFromExplorerTitle(titleEl: HTMLElement, action: "ghostty" | "vibe-shell"): Promise<void> {
+    const file = this.getFileFromExplorerTitle(titleEl);
+    if (!file) {
+      new Notice("Ghostty Terminal: could not resolve the selected file or folder.");
+      return;
+    }
+
+    if (action === "vibe-shell") {
+      await this.openVibeShellAtAbstractFile(file);
+      return;
+    }
+
+    await this.openAtAbstractFile(file);
+  }
+
+  private getFileFromExplorerTitle(titleEl: HTMLElement): TAbstractFile | null {
+    const pathEl = titleEl.hasAttribute("data-path")
+      ? titleEl
+      : titleEl.closest<HTMLElement>("[data-path]");
+    const vaultRelativePath = pathEl?.getAttribute("data-path");
+    if (!vaultRelativePath) {
+      return null;
+    }
+
+    return this.app.vault.getAbstractFileByPath(vaultRelativePath);
   }
 
   private addFileMenuItems(menu: Menu, file: TAbstractFile): void {
@@ -343,7 +503,38 @@ class GhosttyTerminalSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    new Setting(containerEl)
+      .setName("Show Ghostty inline button")
+      .setDesc("Show an Open in Ghostty button on file explorer rows when hovered.")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showGhosttyInlineButton)
+          .onChange(async (value) => {
+            this.plugin.settings.showGhosttyInlineButton = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshFileExplorerInlineActions();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Show Vibe Shell inline button")
+      .setDesc("Show an Open in Vibe Shell button on file explorer rows when hovered.")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showVibeShellInlineButton)
+          .onChange(async (value) => {
+            this.plugin.settings.showVibeShellInlineButton = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshFileExplorerInlineActions();
+          });
+      });
   }
+}
+
+function stopInlineActionEvent(event: Event): void {
+  event.preventDefault();
+  event.stopPropagation();
 }
 
 function execFileAsync(file: string, args: string[]): Promise<string> {
