@@ -29,6 +29,7 @@ The first launch may trigger a macOS Automation permission prompt allowing Obsid
 
 - `Ghostty app name`: AppleScript application name. Keep the default `Ghostty` unless your app is renamed.
 - `Ribbon default location`: choose whether the ribbon and default command open the current file folder or vault root.
+- `Focus existing terminal`: focus a Ghostty terminal with the same working directory instead of opening a duplicate window.
 - `Initial input`: optional text to send after opening the new Ghostty window, such as `nvim .`.
 
 ## Community Plugin Install

@@ -18,12 +18,14 @@ type DefaultOpenLocation = "current-file-folder" | "vault-root";
 interface GhosttyTerminalSettings {
   ghosttyAppName: string;
   defaultOpenLocation: DefaultOpenLocation;
+  focusExistingTerminal: boolean;
   initialInput: string;
 }
 
 const DEFAULT_SETTINGS: GhosttyTerminalSettings = {
   ghosttyAppName: "Ghostty",
   defaultOpenLocation: "current-file-folder",
+  focusExistingTerminal: true,
   initialInput: ""
 };
 
@@ -175,18 +177,29 @@ export default class GhosttyTerminalPlugin extends Plugin {
     const escapedAppName = escapeAppleScriptString(this.settings.ghosttyAppName);
     const escapedWorkingDirectory = escapeAppleScriptString(workingDirectory);
     const escapedInitialInput = escapeAppleScriptString(this.settings.initialInput.trim());
+    const focusExistingBlock = this.settings.focusExistingTerminal
+      ? `
+        set matchingTerminals to every terminal whose working directory is targetDirectory
+        if (count of matchingTerminals) > 0 then
+          set targetTerminal to item 1 of matchingTerminals
+          focus targetTerminal
+          return
+        end if`
+      : "";
     const initialInputBlock = escapedInitialInput
       ? `
-        input text "${escapedInitialInput}" to terminal 1 of selected tab of win
-        send key "enter" to terminal 1 of selected tab of win`
+        input text "${escapedInitialInput}" to targetTerminal
+        send key "enter" to targetTerminal`
       : "";
 
     return `
       tell application "${escapedAppName}"
         activate
+        set targetDirectory to "${escapedWorkingDirectory}"${focusExistingBlock}
         set cfg to new surface configuration
-        set initial working directory of cfg to "${escapedWorkingDirectory}"
-        set win to new window with configuration cfg${initialInputBlock}
+        set initial working directory of cfg to targetDirectory
+        set win to new window with configuration cfg
+        set targetTerminal to terminal 1 of selected tab of win${initialInputBlock}
       end tell
     `;
   }
@@ -227,6 +240,18 @@ class GhosttyTerminalSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.defaultOpenLocation)
           .onChange(async (value: DefaultOpenLocation) => {
             this.plugin.settings.defaultOpenLocation = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Focus existing terminal")
+      .setDesc("Focus an existing Ghostty terminal with the same working directory instead of opening a new window.")
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.focusExistingTerminal)
+          .onChange(async (value) => {
+            this.plugin.settings.focusExistingTerminal = value;
             await this.plugin.saveSettings();
           });
       });
